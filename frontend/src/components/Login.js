@@ -1,5 +1,4 @@
 import { useState } from "react";
-import axios from "axios";
 import API from "../services/api";
 
 function Login({ setToken }) {
@@ -8,13 +7,12 @@ function Login({ setToken }) {
 
   const login = async () => {
     try {
-      const res = await axios.post(`${API}/auth/login`, {
+      const res = await API.post("/auth/login", {
         username,
         password,
       });
 
       const token = res.data.access_token;
-
       localStorage.setItem("token", token);
       setToken(token);
 
@@ -25,11 +23,27 @@ function Login({ setToken }) {
   };
 
   return (
-    <div>
-      <h3>Login</h3>
-      <input placeholder="Username" onChange={(e) => setUsername(e.target.value)} />
-      <input type="password" placeholder="Password" onChange={(e) => setPassword(e.target.value)} />
-      <button onClick={login}>Login</button>
+    <div className="login-container">
+      <div className="card login-card">
+        <h2 className="title">🔐 Login</h2>
+
+        <input
+          className="input"
+          placeholder="Username"
+          onChange={(e) => setUsername(e.target.value)}
+        />
+
+        <input
+          className="input"
+          type="password"
+          placeholder="Password"
+          onChange={(e) => setPassword(e.target.value)}
+        />
+
+        <button className="btn btn-primary" onClick={login}>
+          Login
+        </button>
+      </div>
     </div>
   );
 }

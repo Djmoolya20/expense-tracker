@@ -1,14 +1,21 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
 import API from "../services/api";
+import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
+
+const COLORS = ["#4CAF50", "#2196F3", "#FF9800", "#F44336", "#9C27B0", "#00BCD4"];
 
 function ExpenseList({ token }) {
   const [data, setData] = useState([]);
 
-  // 🔹 Function to fetch data
+  // ✅ EDIT STATES (INSIDE COMPONENT)
+  const [editingId, setEditingId] = useState(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editCategory, setEditCategory] = useState("");
+
+  // 🔹 FETCH
   const fetchExpenses = async () => {
     try {
-      const res = await axios.get(`${API}/expense`, {
+      const res = await API.get("/expense", {
         headers: { Authorization: `Bearer ${token}` },
       });
       setData(res.data);
@@ -17,89 +24,174 @@ function ExpenseList({ token }) {
     }
   };
 
-  // ✅ 🔥 ADD YOUR useEffect HERE
   useEffect(() => {
     if (!token) return;
 
-    fetchExpenses(); // initial load
-
-    const interval = setInterval(() => {
-      fetchExpenses();
-    }, 5000);
-
-    return () => clearInterval(interval); // cleanup
+    fetchExpenses();
+    const interval = setInterval(fetchExpenses, 5000);
+    return () => clearInterval(interval);
   }, [token]);
 
-  // 🔹 Delete function
+  // 🔹 DELETE
   const deleteExpense = async (id) => {
-    await axios.delete(`${API}/expense/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    fetchExpenses();
+    try {
+      await API.delete(`/expense/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      fetchExpenses();
+    } catch (err) {
+      console.log(err);
+    }
   };
-  const getTotal = () => {
-  return data.reduce((sum, e) => sum + Number(e.amount), 0);
-};
+
+  // 🔹 UPDATE
+  const updateExpense = async (id) => {
+    try {
+      await API.put(
+        `/expense/${id}`,
+        {
+          amount: editAmount,
+          category: editCategory,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      setEditingId(null);
+      fetchExpenses();
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  // 🔹 TOTAL
+  const total = data.reduce((sum, e) => sum + Number(e.amount), 0);
+
+  // 🔹 GROUP
+  const grouped = data.reduce((acc, e) => {
+    acc[e.category] = (acc[e.category] || 0) + Number(e.amount);
+    return acc;
+  }, {});
+
+  // 🔹 CHART DATA
+  const chartData = Object.keys(grouped).map((key) => ({
+    name: key,
+    value: grouped[key],
+  }));
+
+
   return (
-  <div style={{ maxWidth: "600px", margin: "auto" }}>
-    
-    {/* 🔥 TITLE */}
-    <h2 style={{ textAlign: "center" }}>💰 Expense Dashboard</h2>
+    <div className="container">
 
-    {/* 🔥 TOTAL CARD */}
-    <div
-      style={{
-        background: "#4CAF50",
-        color: "white",
-        padding: "15px",
-        borderRadius: "10px",
-        textAlign: "center",
-        marginBottom: "20px",
-        fontSize: "20px",
-      }}
-    >
-      Total: ₹{getTotal()}
-    </div>
-
-    {/* 🔥 REFRESH BUTTON */}
-    <button onClick={fetchExpenses} style={{ marginBottom: "15px" }}>
-      🔄 Refresh
-    </button>
-
-    {/* 🔥 LIST */}
-    {data.map((e) => (
+      {/* 🔥 CATEGORY BREAKDOWN */}
+      <h3>📊 Category Breakdown</h3>
       <div
-        key={e.id}
         style={{
-          background: "#f5f5f5",
+          maxHeight: "150px",
+          overflowY: "auto",
+          background: "#f9f9f9",
           padding: "10px",
-          marginBottom: "10px",
           borderRadius: "8px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
+          marginBottom: "15px",
         }}
       >
-        <div>
-          <strong>₹{e.amount}</strong> — {e.category}
-        </div>
+        {Object.keys(grouped).map((cat) => (
+          <div key={cat}>
+            {cat}: ₹{grouped[cat]}
+          </div>
+        ))}
+      </div>
 
-        <button
-          onClick={() => deleteExpense(e.id)}
-          style={{
-            background: "red",
-            color: "white",
-            border: "none",
-            padding: "5px 10px",
-            borderRadius: "5px",
-          }}
-        >
-          Delete
-        </button>
+      {/* 🔥 CHART */}
+      <h3>📊 Category Chart</h3>
+      <div className="card">
+        <PieChart width={350} height={300}>
+          <Pie
+            data={chartData}
+            cx="50%"
+            cy="50%"
+            outerRadius={110}
+            dataKey="value"
+            label={false}
+          >
+            {chartData.map((entry, index) => (
+              <Cell key={index} fill={COLORS[index % COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip formatter={(value) => `₹${value}`} />
+          <Legend />
+        </PieChart>
+      </div>
+
+      {/* 🔥 TOTAL */}
+      <div className="total-card">
+        Total: ₹{total}
+      </div>
+
+
+      {/* 🔥 LIST */}
+<div className="card">
+  <div className="list-scroll">
+    {data.map((e) => (
+      <div key={e.id} className="list-item">
+
+        {editingId === e.id ? (
+          <>
+            <input
+              className="input small"
+              value={editAmount}
+              onChange={(ev) => setEditAmount(ev.target.value)}
+            />
+
+            <input
+              className="input small"
+              value={editCategory}
+              onChange={(ev) => setEditCategory(ev.target.value)}
+            />
+
+            <button className="btn btn-primary" onClick={() => updateExpense(e.id)}>
+              Save
+            </button>
+
+            <button className="btn btn-secondary" onClick={() => setEditingId(null)}>
+              Cancel
+            </button>
+          </>
+        ) : (
+          <>
+            <div>
+              <strong>₹{e.amount}</strong> — {e.category}
+            </div>
+
+            <div className="actions">
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  setEditingId(e.id);
+                  setEditAmount(e.amount);
+                  setEditCategory(e.category);
+                }}
+              >
+                Edit
+              </button>
+
+              <button
+                className="btn btn-danger"
+                onClick={() => deleteExpense(e.id)}
+              >
+                Delete
+              </button>
+            </div>
+          </>
+        )}
+
       </div>
     ))}
   </div>
-);
+</div>
+    </div>
+  );
 }
 
 export default ExpenseList;

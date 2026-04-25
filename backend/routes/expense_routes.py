@@ -35,16 +35,18 @@ def get_expenses():
     if category:
         query = query.filter_by(category=category)
 
-    expenses = query.all()
+    expenses = query.order_by(Expense.created_at.desc()).all()
 
-    return jsonify([
-        {
+    result = []
+    for e in expenses:
+        result.append({
             "id": e.id,
             "amount": e.amount,
-            "category": e.category
-        } for e in expenses
-    ])
+            "category": e.category,
+            "description": e.description
+        })
 
+    return jsonify(result)
 
 @expense_bp.route('/expense/<int:id>', methods=['PUT'])
 @jwt_required()
@@ -52,13 +54,14 @@ def update_expense(id):
     user_id = int(get_jwt_identity())
 
     expense = Expense.query.filter_by(id=id, user_id=user_id).first()
-
     if not expense:
         return jsonify({"msg": "Not found"}), 404
 
     data = request.json
+
     expense.amount = data.get('amount', expense.amount)
     expense.category = data.get('category', expense.category)
+    expense.description = data.get('description', expense.description)
 
     db.session.commit()
 
@@ -71,7 +74,6 @@ def delete_expense(id):
     user_id = int(get_jwt_identity())
 
     expense = Expense.query.filter_by(id=id, user_id=user_id).first()
-
     if not expense:
         return jsonify({"msg": "Not found"}), 404
 
